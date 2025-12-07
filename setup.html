@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Setup - Smart Speaker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>System Setup</h1>
+            <a href="/" style="color: var(--primary)">← Back to Home</a>
+        </header>
+
+        <div class="card">
+            <h2>Add Medicine Stock</h2>
+            <div class="form-group">
+                <label>Medicine Name</label>
+                <input type="text" id="medName" placeholder="e.g. Vitamin D">
+            </div>
+            <div class="form-group">
+                <label>Current Stock (Count)</label>
+                <input type="number" id="medStock" placeholder="e.g. 30">
+            </div>
+            <button onclick="addMedicine()">Add Medicine</button>
+        </div>
+
+        <div class="card">
+            <h2>Add Schedule</h2>
+            <div class="form-group">
+                <label>Select Medicine</label>
+                <select id="scheduleMedName">
+                    <!-- Populated via JS -->
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Time (24h)</label>
+                <input type="time" id="scheduleTime">
+            </div>
+            <div class="form-group">
+                <label>Dosage (Tablets)</label>
+                <input type="number" id="scheduleDosage" value="1">
+            </div>
+            <button onclick="addSchedule()">Set Reminder</button>
+        </div>
+
+        <div id="statusMessage" style="text-align: center; margin-top: 10px; color: var(--secondary)"></div>
+    </div>
+
+    <script>
+        // Load meds for dropdown
+        async function loadMeds() {
+            const res = await fetch('/api/config');
+            const data = await res.json();
+            const select = document.getElementById('scheduleMedName');
+            select.innerHTML = '';
+            data.medicines.forEach(med => {
+                const opt = document.createElement('option');
+                opt.value = med.name;
+                opt.textContent = `${med.name} (Stock: ${med.stock})`;
+                select.appendChild(opt);
+            });
+        }
+
+        async function addMedicine() {
+            const name = document.getElementById('medName').value;
+            const stock = document.getElementById('medStock').value;
+            if (!name || !stock) return alert("Fill all fields");
+
+            await fetch('/api/setup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'add_med', name, stock })
+            });
+
+            document.getElementById('medName').value = '';
+            document.getElementById('medStock').value = '';
+            showMessage("Medicine Added!");
+            loadMeds();
+        }
+
+        async function addSchedule() {
+            const med_name = document.getElementById('scheduleMedName').value;
+            const time = document.getElementById('scheduleTime').value;
+            const dosage = document.getElementById('scheduleDosage').value;
+
+            if (!med_name || !time) return alert("Fill all fields");
+
+            await fetch('/api/setup', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'add_schedule', med_name, time, dosage })
+            });
+
+            showMessage("Schedule Saved!");
+        }
+
+        function showMessage(msg) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = msg;
+            setTimeout(() => el.textContent = '', 3000);
+        }
+
+        loadMeds();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Speaker Mode - Smart Speaker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="container" style="text-align: center;">
+        <header>
+            <p class="subtitle">Smart Speaker Mode</p>
+        </header>
+
+        <div class="card" id="speakerCard">
+            <div class="clock-display" id="clock">00:00</div>
+            <p id="dateDisplay" style="color: var(--text-secondary)">--</p>
+        </div>
+
+        <!-- Alert Overlay -->
+        <div id="alertArea" class="alert-box">
+            <h2 id="alertText">Time to take your Medicine!</h2>
+            <p id="alertSub">1 Tablet of Vitamin D</p>
+            <button onclick="confirmTaken()" style="font-size: 1.2rem; padding: 20px;">✅ I took it</button>
+            <br><br>
+            <button class="secondary" onclick="ignoreReminder()">Ignore (Simulate Miss)</button>
+        </div>
+
+        <div style="margin-top: 50px;">
+            <p style="font-size: 0.8rem; color: #555">This screen simulates the device face.</p>
+            <a href="/" style="color: #555">Exit</a>
+        </div>
+    </div>
+
+    <script>
+        let config = { schedules: [] };
+        let activeAlert = null; // { med_name, dosage, time }
+        let lastAnnounceTime = 0;
+
+        // Poll config every 5s to stay updated
+        async function loadConfig() {
+            try {
+                const res = await fetch('/api/config');
+                config = await res.json();
+            } catch (e) { console.error(e); }
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+            document.getElementById('clock').textContent = timeStr;
+            document.getElementById('dateDisplay').textContent = now.toDateString();
+
+            checkSchedule(timeStr);
+        }
+
+        function checkSchedule(currentTime) {
+            // Check if any schedule matches current time
+            // Only trigger if we haven't already triggered for this specific schedule today/minute
+            // For simulation simplicity, we trigger if time matches and we aren't already alerting.
+
+            if (activeAlert) return; // Already alerting
+
+            const match = config.schedules.find(s => s.time === currentTime);
+            if (match) {
+                // Check if we just suppressed this (to avoid infinite loop in same minute)
+                const alreadyHandled = sessionStorage.getItem(`handled-${currentTime}-${match.med_name}`);
+                if (!alreadyHandled) {
+                    triggerAlert(match);
+                }
+            }
+        }
+
+        function triggerAlert(schedule) {
+            activeAlert = schedule;
+            document.getElementById('alertArea').classList.add('visible');
+            document.getElementById('speakerCard').classList.add('reminder-active');
+
+            document.getElementById('alertSub').textContent = `${schedule.dosage} tablet(s) of ${schedule.med_name}`;
+
+            // Speak
+            speak(`Time to take your ${schedule.dosage} tablet of ${schedule.med_name}`);
+
+            // Repeat speech every 10s if ignored
+            activeAlert.interval = setInterval(() => {
+                speak(`Reminder: Please take your ${schedule.med_name}`);
+            }, 10000);
+
+            // Auto-mark missed after 1 min (simulation speedup)
+            activeAlert.timeout = setTimeout(() => {
+                reportMissed(schedule);
+            }, 60000);
+        }
+
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                const utterance = new window.SpeechSynthesisUtterance(text);
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        async function confirmTaken() {
+            if (!activeAlert) return;
+
+            clearInterval(activeAlert.interval);
+            clearTimeout(activeAlert.timeout);
+
+            // API Call
+            await fetch('/api/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'taken',
+                    med_name: activeAlert.med_name,
+                    dosage: activeAlert.dosage
+                })
+            });
+
+            speak("Thank you. Medicine recorded.");
+            resetAlert(true);
+        }
+
+        async function reportMissed(schedule) {
+            speak(`You missed your dose of ${schedule.med_name}. Notifying caregiver.`);
+            await fetch('/api/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: 'missed',
+                    med_name: schedule.med_name,
+                    time: schedule.time
+                })
+            });
+            resetAlert(true);
+        }
+
+        function ignoreReminder() {
+            reportMissed(activeAlert); // Setup to manually trigger 'Missed' logic for playing around
+        }
+
+        function resetAlert(handled) {
+            if (activeAlert && handled) {
+                sessionStorage.setItem(`handled-${activeAlert.time}-${activeAlert.med_name}`, 'true');
+            }
+
+            document.getElementById('alertArea').classList.remove('visible');
+            document.getElementById('speakerCard').classList.remove('reminder-active');
+
+            if (activeAlert) {
+                clearInterval(activeAlert.interval);
+                clearTimeout(activeAlert.timeout);
+            }
+            activeAlert = null;
+        }
+
+        loadConfig();
+        setInterval(loadConfig, 10000);
+        setInterval(updateClock, 1000);
+    </script>
+</body>
+
+</html>

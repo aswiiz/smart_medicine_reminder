@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard - Smart Speaker</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Refresh every 5s to simulate real-time notification feed -->
+    <meta http-equiv="refresh" content="5">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Caregiver Dashboard</h1>
+            <a href="/" style="color: var(--primary)">← Back to Home</a>
+        </header>
+
+        <div class="card">
+            <h2>📢 Notification Log Service</h2>
+            <p style="font-size: 0.9em; color: gray;">Simulates SMS/WhatsApp messages sent to phone</p>
+            <ul class="log-list" id="logList">
+                <li>Loading logs...</li>
+            </ul>
+        </div>
+
+        <div class="card">
+            <h2>💊 Medicine Inventory</h2>
+            <ul class="log-list" id="stockList">
+                <!-- Stock -->
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        async function loadData() {
+            try {
+                const res = await fetch('/api/config');
+                const data = await res.json();
+
+                // Render Logs
+                const logList = document.getElementById('logList');
+                logList.innerHTML = '';
+                if (data.logs.length === 0) logList.innerHTML = '<li style="padding:10px; color:gray">No activity yet.</li>';
+
+                data.logs.forEach(log => {
+                    const li = document.createElement('li');
+                    li.className = `log-item ${log.type}`;
+                    li.innerHTML = `
+                        <span>${log.message}</span>
+                        <span style="font-size:0.8em; color:gray;">${new Date(log.timestamp).toLocaleTimeString()}</span>
+                    `;
+                    logList.appendChild(li);
+                });
+
+                // Render Stock
+                const stockList = document.getElementById('stockList');
+                stockList.innerHTML = '';
+                data.medicines.forEach(med => {
+                    const li = document.createElement('li');
+                    li.className = 'log-item';
+
+                    // Highlight low stock
+                    let stockColor = 'white';
+                    if (med.stock <= med.low_threshold) stockColor = '#cf6679'; // error color
+
+                    li.innerHTML = `
+                        <span>${med.name}</span>
+                        <span style="color: ${stockColor}; font-weight: bold;">${med.stock} Remaining</span>
+                    `;
+                    stockList.appendChild(li);
+                });
+
+            } catch (e) { console.error("Fetch error", e); }
+        }
+
+        loadData();
+    </script>
+</body>
+
+</html>
