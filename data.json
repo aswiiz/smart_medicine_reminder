@@ -1,0 +1,28 @@
+{
+  "medicines": [
+    {
+      "name": "vitamin d",
+      "stock": 9,
+      "low_threshold": 5
+    }
+  ],
+  "schedules": [
+    {
+      "med_name": "vitamin d",
+      "time": "14:00",
+      "dosage": 1
+    },
+    {
+      "med_name": "vitamin d",
+      "time": "11:36",
+      "dosage": 1
+    }
+  ],
+  "logs": [
+    {
+      "type": "ACTION",
+      "message": "Taken: 1 vitamin d. Remaining: 9",
+      "timestamp": "2025-12-07T11:36:17.144958"
+    }
+  ]
+}
